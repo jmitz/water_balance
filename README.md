@@ -60,6 +60,7 @@ Oftentimes, people need to work in older versions of R for certain packages. For
 - `here`
   1. install.packages('here')
   2. library(here)
+  - This was required to run model_selection_graph.R
 
 ### Run the scripts in the following order:
 
