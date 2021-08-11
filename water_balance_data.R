@@ -52,7 +52,6 @@ createSiteInfo <- function(
 }
 
 genPath <- function(path){
-  print(path)
   if (!file.exists(here::here(path))){
     here::here(dir.create(path))
   }
@@ -232,6 +231,31 @@ genThreddsUrl <- function(
   return(dataUrl)
 }
 
+readUrl <- function(url, attempt=1, maxAttempts=3){
+  output <- NULL
+  thisFrame <- environment()
+  tryCatch(
+    {
+      text <- getURL(url)
+      names <- read.table(text=text, sep=",", nrows=1)
+      output <- read.table(text=text, sep=",", col.names=names, skip=1)
+    },
+    error=function(cond){
+      cat("*")
+      if (attempt <= maxAttempts){
+        thisFrame$output <- readUrl(url, attempt=attempt+1, maxAttempts=maxAttempts)
+      }
+      else {
+        message("Data not read properly")
+        message(url)
+        message(cond)
+        stop()
+      }
+    }
+  ) 
+  return (output)
+}
+
 genData <- function(
   siteInfo,
   dataset="gridMET",
@@ -252,9 +276,7 @@ genData <- function(
       cat(toString(yr), "")
       url <- genThreddsUrl(lat, lon, dataset, yr, climvar, rcpLevel=rcpLevel, monthly=monthly)
       if (url != -1){
-        text <- getURL(url)
-        names <- read.table(text=text, sep=",", nrows=1)
-        readData <- read.table(text=text, sep=",", col.names=names, skip=1)
+        readData <- readUrl(url)
         periodAccumulator <- rbind(periodAccumulator, readData)
       }
     }
@@ -268,8 +290,6 @@ genData <- function(
       x/10
     }
     colAccumulator <- colAccumulator / 10
-    print(dataset)
-    print("Need to divide by 10")
   }
   outNames <- c("date", "lat", "lon", paste(tolower(climvarList), ifelse(monthly, "monthly", "daily"), sep="_"))
   outData <- cbind(periodAccumulator[,1:3], colAccumulator)
