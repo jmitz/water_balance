@@ -17,10 +17,9 @@
 # historical daily, historical monthly, future daily (all models), future monthly (all models)
 # adjust as needed
 # ----------
-
+library(plyr) 
 library(data.table) 
 library(here)
-library(plyr) 
 # be careful with this, it causes issues for dplyr::group_by
 # I didn't try, but the internet says if you load it before tidyverse, that issue goes away
 library(tidyverse)
@@ -93,21 +92,23 @@ buildFileStructure <- function(site, lat, lon){
 
 buildFilePath <- function(
   siteInfo,
-  dataset="gridMET",
-  rcpLevel="rcp45",
+  dataset=list(
+    model="gridMET",
+    rcp=""
+  ),
   monthly=F)
 {
-  site <- siteInfo["Park"]
-  lat <- siteInfo["Lat"]
-  lon <- siteInfo["Long"]
+  site <- siteInfo$Name
+  lat <- siteInfo$Lat
+  lon <- siteInfo$Long
   currYear <- year(Sys.Date())
-  timeFrame <- getDatasetType(dataset)
+  timeFrame <- getDatasetType(dataset$model)
   if (timeFrame == 'historical'){
     rcpString <- ""
     endYear <- endHistoric
   }
   else if (timeFrame == "future"){
-    rcpString <- str_interp("${rcpLevel}_")
+    rcpString <- str_interp("${dataset$rcp}_")
     startYear <- startFuture
   }
   else return(F)
@@ -125,7 +126,7 @@ buildFilePath <- function(
     }/${
       site
     }_${
-      dataset
+      dataset$model
     }_${
       ifelse(timeFrame == \"historical\", \"\", rcpString)
     }${
@@ -265,8 +266,8 @@ genData <- function(
   rcpLevel="rcp45",
   climvarList=c("soil_water", "runoff", "rain", "accumswe", "PET", "Deficit", "AET")
 ){
-  lat <- siteInfo["Lat"]
-  lon <- siteInfo["Long"]
+  lat <- siteInfo$Lat
+  lon <- siteInfo$Long
 
   colAccumulator <- NULL
   for (climvar in climvarList){
@@ -300,42 +301,59 @@ genData <- function(
 
 getData <- function(
   siteInfo,
-  datasets=c("gridMET", "CanESM2", "HadGEM2-CC365", "MRI-CGCM3"),
-  rcpLevels=c("rcp45", "rcp85"),
-  timePeriods=c("daily", "monthly")
+  datasets=list(
+    historic=list(
+      model="gridMET",
+      rcp=""
+    ),
+    wcModel=list(
+      model="CanESM2",
+      rcp="rcp85"
+    ),
+    wc2Model=list(
+      model="HadGEM2-CC365",
+      rcp="rcp85"
+    ),
+    bcModel=list(
+      model="MRI-CGCM3",
+      rcp="rcp45"
+    )
+  ),
+  timePeriods=c("daily", "monthly"),
+  climvarList=c("soil_water", "runoff", "rain", "accumswe", "PET", "Deficit", "AET")
 )
 {
-  site <- siteInfo["Park"]
-  lat <- siteInfo["Lat"]
-  lon <- siteInfo["Long"]
+  site <- siteInfo$Name
+  lat <- siteInfo$Lat
+  lon <- siteInfo$Long
 
   # Build File Structure
   buildFileStructure(site, lat, lon)
 
-  # Get Historic Data
+  # Get Data
+  rcpLevel <- ''
   for (dataset in datasets){
-    if (toupper(dataset) %in% toupper(historicData)){
+    if (toupper(dataset$model) %in% toupper(historicData)){
       beginYear <- startYear
       doneYear <- endHistoric
+      rcpLevel <- ''
     }
-    else if (toupper(dataset) %in% toupper(futureModels)){
+    else if (toupper(dataset$model) %in% toupper(futureModels)){
       beginYear <- startFuture
       doneYear <- endYear
+      rcpLevel <- dataset$rcp
     }
 
-    for(rcpLevel in rcpLevels){
-      for(timePeriod in timePeriods){
-        monthly <- (timePeriod == "monthly")
+    for(timePeriod in timePeriods){
+      monthly <- (timePeriod == "monthly")
 
-        fileName <- buildFilePath(siteInfo, dataset=dataset, rcpLevel=rcpLevel, monthly=monthly)
+      fileName <- buildFilePath(siteInfo, dataset=dataset, monthly=monthly)
 
-        # Check to see if siteData has already been downloaded
-        if (! file.exists(here::here(fileName))){
-          print(fileName)
-          thisData <- genData(siteInfo, dataset=dataset, monthly=monthly, startYear=beginYear, endYear=doneYear, rcpLevel=rcpLevel)
-          write_csv(thisData, here::here(fileName))
-
-        }
+      # Check to see if siteData has already been downloaded
+      if (! file.exists(here::here(fileName))){
+        print(fileName)
+        thisData <- genData(siteInfo, dataset=dataset$model, monthly=monthly, startYear=beginYear, endYear=doneYear, rcpLevel=rcpLevel, climvarList=climvarList)
+        write_csv(thisData, here::here(fileName))
       }
     }
   }
@@ -346,7 +364,7 @@ getData <- function(
 # getData <- function(
 #   siteInfo, past_data = "gridMET"){
 #   thisSiteInfo <- createSiteInfo(siteInfo, past_data)
-#   buildFileStructure(thisSiteInfo["Park"], thisSiteInfo["Lat"], thisSiteInfo["Long"])
+#   buildFileStructure(thisSiteInfo$Name, thisSiteInfo$Lat, thisSiteInfo$Long)
 #   # getHistoricalDailyData(thisSiteInfo, start = 1980, end = 1989)
 #   getHistoricalMonthlyData(thisSiteInfo, start = 1980, end = 1989)
 # }
