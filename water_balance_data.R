@@ -69,7 +69,7 @@ getDatasetType <- function(datasetName){
   return(returnType)
 }
 
-buildFileStructure <- function(site, lat, lon){
+buildFileStructure <- function(site, lat, lon, dataType="raw_data"){
   # create subfolders for data 
 
   path <- "sites"
@@ -78,15 +78,17 @@ buildFileStructure <- function(site, lat, lon){
   path <- paste(path, site, sep = "/")
   genPath(path)
 
-  path <- paste(path, "raw_data", sep = "/")
+  path <- paste(path, dataType, sep = "/")
   genPath(path)
 
   path <- paste(path, paste("lat",sprintf("%0.5f", lat),"lon",sprintf("%0.5f", lon),sep = "_"), sep = "/")
   genPath(path)
 
-  for (i in c("historical_daily", "historical_monthly", "future_daily", "future_monthly")){
-    thisPath <- paste(path, i, sep = "/")
-    genPath(thisPath)
+  if (dataType == "raw_data"){
+    for (i in c("historical_daily", "historical_monthly", "future_daily", "future_monthly")){
+      thisPath <- paste(path, i, sep = "/")
+      genPath(thisPath)
+    }
   }
 }
 
@@ -361,10 +363,13 @@ getData <- function(
 }
 
 
-# getData <- function(
-#   siteInfo, past_data = "gridMET"){
-#   thisSiteInfo <- createSiteInfo(siteInfo, past_data)
-#   buildFileStructure(thisSiteInfo$Name, thisSiteInfo$Lat, thisSiteInfo$Long)
-#   # getHistoricalDailyData(thisSiteInfo, start = 1980, end = 1989)
-#   getHistoricalMonthlyData(thisSiteInfo, start = 1980, end = 1989)
-# }
+getAllData <- function(
+  sitelist,
+  datasets,
+  climvarList=c("Deficit")
+){
+  for (rowNum in 1:nrow(sitelist)){
+    site <- sitelist[rowNum,]
+    getData(site, climvarList=climvarList)
+  }
+}
